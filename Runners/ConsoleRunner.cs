@@ -194,23 +194,14 @@ namespace Roguelike.Runners
             return input;
         }
 
-        public static void SetCursorForInput()
-        {
-            Console.SetCursorPosition(CURSOR_INPUT.X, CURSOR_INPUT.Y);
-        }
-
-        public static void ResetInputField()
+        public static void ResetInputField(string? newInput = null)
         {
             var blanks = ' '.Repeat(WIN_W - SIDE_BAR_W - 4);
             _engine.WriteText(CURSOR_INPUT, blanks);
-            Refresh();
-        }
-
-        public static void ResetInputField(string newInput)
-        {
-            var blanks = ' '.Repeat(WIN_W - SIDE_BAR_W - 4);
-            _engine.WriteText(CURSOR_INPUT, blanks);
-            _engine.WriteText(CURSOR_INPUT, newInput);
+            if(newInput != null)
+            {
+                _engine.WriteText(CURSOR_INPUT, newInput);
+            }
             Refresh();
         }
 
