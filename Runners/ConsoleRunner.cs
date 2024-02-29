@@ -1,5 +1,4 @@
-﻿using static System.Console;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using ConsoleGameEngine;
 using static Roguelike.World;
 using Roguelike.Engine;
@@ -47,13 +46,13 @@ namespace Roguelike.Runners
             _engine.Borderless();
             _engine.ClearBuffer();
             _engine.SetDefaultColor(Colors.White);
-            _engine.Fill(FIRST_CHAR, FINAL_CHAR, 0);
+            _engine.Fill(FIRST_CHAR, FINAL_CHAR, Colors.Black);
             DrawRect(FIRST_CHAR, FINAL_CHAR);
-            DrawBar(new (0, TOP_BAR_H), WIN_W, LEFT_T, RIGHT_T);
+            DrawBar(new (0, TOP_BAR_H), WIN_W, LEFT_T, RIGHT_T); //fix right connect
             DrawPipe(new (SIDE_BAR_W, 0), WIN_H, TOP_T, BOT_T);
             _engine.WriteText(new(SIDE_BAR_W, TOP_BAR_H), CROSS);
             DrawBar(new (SIDE_BAR_W, WIN_H - 3), WIN_W - SIDE_BAR_W, LEFT_T, RIGHT_T);
-            DrawBar(new (0, SIDE_BAR_W + 6), SIDE_BAR_W + 1, LEFT_T, RIGHT_T);
+            DrawBar(new (0, SIDE_BAR_W + 6), SIDE_BAR_W + 1, LEFT_T, RIGHT_T); //fix right connect
             Refresh();
         }
 
@@ -69,12 +68,13 @@ namespace Roguelike.Runners
 
         public static void Out(ICollection<string> msgs)
         {
+            ClearOutputPane();
             for(var i = 0; i < msgs.Count; ++i)
             {
-                Write(msgs.ElementAt(i));
-                SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + i + 1);
-                Read();
-                SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + i + 1);
+                var writePoint = new Point(CURSOR_WRITE.X, CURSOR_WRITE.Y + i);
+                _engine.WriteText(writePoint, msgs.ElementAt(i));
+                Refresh();
+                Console.Read();
             }
         }
 
@@ -90,14 +90,14 @@ namespace Roguelike.Runners
             Refresh();
             if(!requiresInput)
             {
-                SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + 1);
+                //SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + 1);
                 return new Choice(string.Empty);
             }
 
-            var response = ReadLine();
+            var response = Console.ReadLine();
             while(string.IsNullOrEmpty(response))
             {
-                response = ReadLine();
+                response = Console.ReadLine();
             }
             ResetInputField();
             return new Choice(response);
@@ -106,20 +106,21 @@ namespace Roguelike.Runners
         public static Choice Out(string msg, string[] options)
         {
             ClearOutputPane();
-            Write(msg);
+            _engine.WriteText(CURSOR_WRITE, msg);
             for(var i = 0; i < options.Length; ++i)
             {
-                SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + i + 1);
-                Write($"[{i + 1}] {options[i]}");
+                var writePoint = new Point(CURSOR_WRITE.X, CURSOR_WRITE.Y + i + 1);
+                _engine.WriteText(writePoint, $"[{i + 1}] {options[i]}");
             }
+            Refresh();
             var choice = 0;
             while(choice == 0)
             {
-                if(int.TryParse(ReadKey().KeyChar.ToString(), out choice))
+                if(int.TryParse(Console.ReadKey().KeyChar.ToString(), out choice))
                 {
                     if(choice != 0 && choice <= options.Length)
                     {
-                        //ResetInputField();
+                        ResetInputField();
                         return new Choice(options[choice - 1], choice);
                     }
                     choice = 0;
@@ -166,7 +167,7 @@ namespace Roguelike.Runners
             while(choice == '+')
             {
                 ResetInputField();
-                choice = ReadKey().KeyChar;
+                choice = Console.ReadKey().KeyChar;
 
                 if(options.Keys.Contains(choice))
                 {
@@ -180,13 +181,13 @@ namespace Roguelike.Runners
 
         public static void SetCursorForInput()
         {
-            SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y);
+            Console.SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y);
         }
 
         public static void ResetInputField()
         {
-            var blanks = ' '.Repeat(WIN_W - SIDE_BAR_W - 3);
-            _engine.WriteText(CURSOR_WRITE, blanks);
+            var blanks = ' '.Repeat(WIN_W - SIDE_BAR_W - 4);
+            _engine.WriteText(CURSOR_INPUT, blanks);
             Refresh();
             SetCursorForInput();
         }
