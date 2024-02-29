@@ -32,7 +32,7 @@ namespace Roguelike
         {
             World.Init();
             ConsoleRunner.UpdateMap(World, CurrentCoord);
-            UpdateCurrentLocationOutput(World[CurrentCoord]);
+            UpdateCurrentLocationOutput();
             MainLoop();
         }
         
@@ -58,7 +58,7 @@ namespace Roguelike
                     Player.Experience += 1;
                     messages.Add("You gain 1xp for exploring a new area.");
                 }
-                UpdateCurrentLocationOutput(newTile);
+                UpdateCurrentLocationOutput();
                 ConsoleRunner.Out(messages, false);
 
                 //Update
@@ -66,8 +66,9 @@ namespace Roguelike
             }
         }
 
-        public void UpdateCurrentLocationOutput(Tile currentTile)
+        public void UpdateCurrentLocationOutput()
         {
+            var currentTile = World[CurrentCoord];
             ConsoleRunner.WriteHeader("Current Location:", $"{currentTile.Type} @ [{currentTile.Coord.X},{currentTile.Coord.Y}]");
         }
 
