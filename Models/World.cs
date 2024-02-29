@@ -1,113 +1,118 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using static TurnBasedGame.ConsoleRunner;
+﻿using System.Diagnostics;
+using static Roguelike.World;
 
-namespace TurnBasedGame
+namespace Roguelike
 {
     public class World
     {
-        private const string WORLDS_END = "The ends of the world.";
-        private static readonly Dictionary<char, string> TRAVEL_OPTIONS;
-
-        private readonly Tile[,] _tiles;
-        private readonly int _width, _height;
-        private readonly Coord _spawnPoint;
+        private static readonly Dictionary<char, string> TravelOptions = new();
+        public string Name { get; private set; }
+        public Tile[,] Tiles { get; private set; }
+        public int Width { get; private set; }
+        public int Height { get; private set; }
+        public Coord? SpawnPoint { get; private set; }
 
         public enum Direction
         {
-            North = 'w',
-            West = 'a',
-            South = 's',
-            East = 'd',
+            North = 0,
+            East = 1,
+            South = 2,
+            West = 3,
         }
 
-        static World()
+        public World(string name, int width, int height)
         {
-            TRAVEL_OPTIONS = new Dictionary<char, string>();
+            Name = name;
+            Width = width;
+            Height = height;
+            Tiles = new Tile[width, height];
         }
 
-        public World(int width, int height, Coord spawnPoint)
-        {
-            _spawnPoint = spawnPoint;
-            _width = width;
-            _height = height;
-            _tiles = new Tile[width, height];
-        }
-
+        /// <summary>
+        /// Builds a random 5x5 World with a central spawn location
+        /// </summary>
         public static World BuildTestWorld()
         {
             var random = new Random();
-            var world = new World(5, 5, new Coord(2, 2));
-            for(var i = 0; i < 5; ++i)
+            var world = new World("TEST", 5, 5);
+            for(var x = 0; x < 5; ++x)
             {
-                for(var j = 0; j < 5; ++j)
+                for(var y = 0; y < 5; ++y)
                 {
-                    var tileType = random.Next(1, 7);
-                    world[i, j] = new Tile((TileType) tileType);
+                    var coord = new Coord(y, x);
+                    world[coord] = Tile.GenerateRandom(coord, random);
                 }
             }
-            world[world._spawnPoint] = new Tile(TileType.Spawn);
+            world.SetSpawn(new Coord(2, 2));
             return world;
         }
 
         public Tile this[int i, int j]
         {
-            get => _tiles[i, j];
-            set => _tiles[i, j] = value;
+            get => Tiles[i, j];
+            set => Tiles[i, j] = value;
         }
 
         public Tile this[Coord coord]
         {
-            get => _tiles[coord.x, coord.y];
-            set => _tiles[coord.x, coord.y] = value;
+            get => Tiles[coord.X, coord.Y];
+            set => Tiles[coord.X, coord.Y] = value;
+        }
+
+        public void SetSpawn(Coord spawnCoord)
+        {
+            SpawnPoint = spawnCoord;
+            var spawnTile = Tile.CreateSpawn(spawnCoord);
+            spawnTile.Type = TileType.Town;
+            this[spawnCoord] = spawnTile;
         }
 
         public void Init()
         {
-            EnterTile(_spawnPoint);
-            _tiles[_spawnPoint.x, _spawnPoint.y] = new Tile(TileType.Town);
+            if(SpawnPoint == null)
+            {
+                throw new NotImplementedException("SpawnPoint must be set with SetSpawn() before initalizing World");
+            }
+            EnterTile(Game.Instance.CurrentCoord);
         }
-
-        private Tile CurrentTile => _tiles[Game.Instance.CurrentCoord.x, Game.Instance.CurrentCoord.y];
 
         private Coord? ToNorth(Coord baseCoord)
         {
-            if(baseCoord.y == 0)
+            if(baseCoord.Y == 0)
                 return null;
 
-            baseCoord.y -= 1;
+            baseCoord.Y -= 1;
             return baseCoord;
         }
 
         private Coord? ToEast(Coord baseCoord)
         {
-            if(baseCoord.x == _width - 1)
+            if(baseCoord.X == Width - 1)
                 return null;
 
-            baseCoord.x += 1;
+            baseCoord.X += 1;
             return baseCoord;
         }
 
         private Coord? ToSouth(Coord baseCoord)
         {
-            if(baseCoord.y == _height - 1)
+            if(baseCoord.Y == Height - 1)
                 return null;
 
-            baseCoord.y += 1;
+            baseCoord.Y += 1;
             return baseCoord;
         }
 
         private Coord? ToWest(Coord baseCoord)
         {
-            if(baseCoord.x == 0)
+            if(baseCoord.X == 0)
                 return null;
 
-            baseCoord.x -= 1;
+            baseCoord.X -= 1;
             return baseCoord;
         }
 
-        private Tile GetNeighbor(Coord baseCoord, Direction direction)
+        private Tile? GetNeighbor(Coord baseCoord, Direction direction)
         {
             Coord? neighborCoord = null;
             switch(direction)
@@ -125,7 +130,14 @@ namespace TurnBasedGame
                     neighborCoord = ToWest(baseCoord);
                     break;
             }
-            return neighborCoord == null ? null : _tiles[neighborCoord.Value.x, neighborCoord.Value.y];
+            if(neighborCoord == null)
+            {
+                return null;
+            }
+            else
+            {
+                return Tiles[neighborCoord.Value.X, neighborCoord.Value.Y];
+            }
         }
 
         private Coord? GetNeighborCoord(Coord baseCoord, Direction direction)
@@ -149,139 +161,68 @@ namespace TurnBasedGame
             return neighborCoord;
         }
 
-        private void EnterTile(Coord coord)
+        private Tile EnterTile(Coord coord)
         {
-            EnterTile(coord.x, coord.y);
+            Game.Instance.CurrentCoord = coord;
+            var tile = this[coord];
+            tile.TurnFirstEnterred = Game.Instance.CurrentTurnNumber;
+            DiscoverNeighbors(tile, coord);
+            return tile;
         }
 
-        private void EnterTile(int x, int y)
+        private void DiscoverNeighbors(Tile tile, Coord baseCoord)
         {
-            Game.Instance.CurrentCoord = new Coord(x, y);
-            var tile = _tiles[x, y];
-            ClearOutputField();
-            DiscoverNeighbors(Game.Instance.CurrentCoord);
-            UpdateMap();
-            Out(tile.Blurb);
+            DiscoverNeighbor(tile, GetNeighborCoord(baseCoord, Direction.North), Direction.North);
+            DiscoverNeighbor(tile, GetNeighborCoord(baseCoord, Direction.East), Direction.East);
+            DiscoverNeighbor(tile, GetNeighborCoord(baseCoord, Direction.South), Direction.South);
+            DiscoverNeighbor(tile, GetNeighborCoord(baseCoord, Direction.West), Direction.West);
         }
 
-        private void DiscoverNeighbors(Coord baseCoord)
+        private void DiscoverNeighbor(Tile baseTile, Coord? neighborCoord, Direction directionFromBase)
         {
-            var n = GetNeighborCoord(baseCoord, Direction.North);
-            if(n.HasValue)
-                _tiles[n.Value.x, n.Value.y].Discovered = true;
-            n = GetNeighborCoord(baseCoord, Direction.East);
-            if(n.HasValue)
-                _tiles[n.Value.x, n.Value.y].Discovered = true;
-            n = GetNeighborCoord(baseCoord, Direction.South);
-            if(n.HasValue)
-                _tiles[n.Value.x, n.Value.y].Discovered = true;
-            n = GetNeighborCoord(baseCoord, Direction.West);
-            if(n.HasValue)
-                _tiles[n.Value.x, n.Value.y].Discovered = true;
+            if(neighborCoord is null) //there is no neighboring tile in this direction
+                return;
+
+            var neighborTile = Tiles[neighborCoord.Value.X, neighborCoord.Value.Y];
+            neighborTile.Discovered = true;
+            baseTile.Neighbors[(int) directionFromBase] = neighborTile;
         }
 
-        public bool OffTheWorld(Coord coord)
+        public bool CoordIsOffWorld(Coord coord)
         {
-            return coord.x < 0 || coord.x >= _width || coord.y < 0 || coord.y >= _height;
+            return coord.X < 0 || coord.X >= Width || coord.Y < 0 || coord.Y >= Height;
         }
 
-        public void EnterNeighbor(Direction direction)
+        public Tile EnterNeighbor(Direction direction)
         {
             var n = GetNeighborCoord(Game.Instance.CurrentCoord, direction);
-            if(!n.HasValue)
+            return n.HasValue 
+                ? EnterTile(n.Value) 
+                : Tile.OffWorld;
+        }
+    }
+
+    [DebuggerDisplay("{X},{Y}")]
+    public struct Coord(int x, int y)
+    {
+        public int X = x;
+        public int Y = y;
+
+        public readonly Coord NewCoordFromMove(Direction direction)
+        {
+            return direction switch
             {
-                ClearOutputField();
-                Out(new string[] { "Oh no, you fell off the world and died!",
-                                   "Better luck next time."});
-                Environment.Exit(69);
-            }
-            EnterTile(n.Value);
+                Direction.North => new(X, Y + 1),
+                Direction.West => new(X - 1, Y),
+                Direction.South => new(X, Y - 1),
+                Direction.East => new(X + 1, Y),
+                _ => throw new NotImplementedException(),
+            };
         }
 
-        public Direction TravelPrompt()
-        {
-            var current = Game.Instance.CurrentCoord;
-            TRAVEL_OPTIONS['w'] = $"To the north: {GetNeighbor(current, Direction.North)?.Type.ToString() ?? WORLDS_END}";
-            TRAVEL_OPTIONS['a'] = $"To the west: {GetNeighbor(current, Direction.West)?.Type.ToString() ?? WORLDS_END}";
-            TRAVEL_OPTIONS['s'] = $"To the south: {GetNeighbor(current, Direction.South)?.Type.ToString() ?? WORLDS_END}";
-            TRAVEL_OPTIONS['d'] = $"To the east: {GetNeighbor(current, Direction.East)?.Type.ToString() ?? WORLDS_END}";
-            return (Direction) Out("Travel?", TRAVEL_OPTIONS);
-        }
-    }
-
-    public enum TileType
-    {
-        Spawn,
-        City,
-        Town,
-        Forest, 
-        Plains,
-        Camp,
-        Hills,
-        Farm,
-        Coast,
-        Ocean
-    }
-
-    public class Tile
-    {
-        private static readonly string[] _blurbs = new string[] {
-            "You find yourself in small town, maybe you should explore a bit?",
-            "A bustling city, stone walls and tall towers with squat row houses at their bases.",
-            "A quaint town with a single main street and a few off shooting alleys.",
-            "Tall green trees and short green bushes, it's awfully foresty around.",
-            "Cart paths and migration trails cross the green and gold plains crossed and crissed.",
-            "A single wisp of smoke rises slowly from beside a worn canvas lean-to.",
-            "Softly undulatintg peaks and valleys for acres.",
-            "The fields here are squared and fenced, it's a farm alright.",
-            "The bronze waves crash on the sandy shores, you can see for miles over the horizon.",
-            "It's water as far as your eyes can sea. Ocean right?",
-        };
-
-        private static readonly char[] _mapTiles = new char[]
-        {
-            'ѧ',
-            'Ѩ',
-            'ѧ',
-            '♣',
-            '░',
-            'ϫ',
-            '\u0488',
-            '▓',
-            '▞',
-            '█',
-        };
-
-        public string Blurb;
-
-        public TileType Type { get; set; }
-
-        public bool Discovered = false;
-
-        public char ToChar()
-        {
-            return _mapTiles[(int) Type];
-        }
-
-        public Tile(TileType type, string blurb = null)
-        {
-            Type = type;
-            if(blurb == null)
-            {
-                Blurb = _blurbs[(int)type];
-            }
-        }
-    }
-
-    public struct Coord
-    {
-        public int x;
-        public int y;
-
-        public Coord(int x, int y)
-        {
-            this.x = x;
-            this.y = y;
-        }
+        public static bool operator == (Coord a, Coord b) => a.X == b.X && a.Y == b.Y;
+        public static bool operator != (Coord a, Coord b) => a.X != b.X || a.Y != b.Y;
+        public override bool Equals(object? obj) => obj is not null and Coord other && this == other;
+        public override int GetHashCode() => (X * 10000) + Y;
     }
 }

@@ -1,28 +1,29 @@
-﻿using System;
-using System.Linq;
-using System.Collections.Generic;
-using System.Text;
-using static TurnBasedGame.World;
-using static System.Console;
-using System.Runtime.InteropServices;
+﻿using static System.Console;
 using System.Diagnostics;
+using ConsoleGameEngine;
+using static Roguelike.World;
+using Roguelike.Engine;
+using Roguelike.Engine.Extensions;
 
-namespace TurnBasedGame
+namespace Roguelike
 {
     public static class ConsoleRunner
     {
-        public static readonly char[] YN = new char[] { 'y', 'n' };
-        private static ConsoleColor currentColor = ConsoleColor.White;
-        private static readonly int WIN_W = LargestWindowWidth;
-        private static readonly int WIN_H = LargestWindowHeight;
-        private static readonly CharCoord FIRST_CHAR = new CharCoord(0, 0);
-        private static readonly CharCoord FINAL_CHAR = new CharCoord(WIN_W - 1, WIN_H - 1);
-        private static readonly CharCoord CURSOR_HOME = new CharCoord(SIDE_BAR_W + 2, WIN_H - 2);
-        private static readonly CharCoord CURSOR_WRITE = new CharCoord(SIDE_BAR_W + 4, TOP_BAR_H + 4);
-        private static readonly CharCoord CURSOR_HEADER = new CharCoord(SIDE_BAR_W + 4, TOP_BAR_H + 2);
-        private static readonly CharCoord NAME_SLOT = new CharCoord(2, 1);
-        private static readonly CharCoord LEVEL_SLOT = new CharCoord(2, 2);
-        private static readonly CharCoord MAP_CENTRE = new CharCoord(SIDE_BAR_W/2, SIDE_BAR_W + 12);
+        public static readonly char[] YN = ['y', 'n'];
+        private static readonly int WIN_W = 120;
+        private static readonly int WIN_H = 30;
+        private static readonly Point FIRST_CHAR = new (0, 0);
+        private static readonly Point FINAL_CHAR = new (WIN_W - 1, WIN_H - 1);
+        private static readonly Point OUTPUT_PANE_START = new(SIDE_BAR_W + 1, TOP_BAR_H + 1);
+        private static readonly Point OUTPUT_PANE_END = new(WIN_W - 1, WIN_H - 4);
+        private static readonly Point CURSOR_INPUT = new (SIDE_BAR_W + 2, WIN_H - 2);
+        private static readonly Point CURSOR_WRITE = new (SIDE_BAR_W + 4, TOP_BAR_H + 2);
+        private static readonly Point CURSOR_HEADER = new (SIDE_BAR_W + 4, TOP_BAR_H + 1);
+        private static readonly Point NAME_SLOT = new (2, 1);
+        private static readonly Point XP_SLOT = new (2, 2);
+        private static readonly Point HP_SLOT = new (15, 2);
+
+        private static readonly Point MAP_CENTRE = new (SIDE_BAR_W / 2, 12);
 
         private const int TOP_BAR_H = 3;
         private const int SIDE_BAR_W = 30;
@@ -39,60 +40,63 @@ namespace TurnBasedGame
         private const char BAR = '═';
         private const char PIPE = '║';
 
-        #region Externals For Console Window Control
-        [DllImport("kernel32.dll", ExactSpelling = true)]
-        private static extern IntPtr GetConsoleWindow();
-        private static readonly IntPtr _thisConsole = GetConsoleWindow();
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-        #endregion
+        private static readonly ConsoleEngine _engine = new(WIN_W, WIN_H, 8, 8);
 
         public static void Init()
         {
-            OutputEncoding = Encoding.UTF8;
-            ShowWindow(_thisConsole, 3);
-            Clear();
-            SetBufferSize(WIN_W, WIN_H);
-            SetWindowSize(WIN_W, WIN_H);
+            _engine.Borderless();
+            _engine.ClearBuffer();
+            _engine.SetDefaultColor(Colors.White);
+            _engine.Fill(FIRST_CHAR, FINAL_CHAR, 0);
             DrawRect(FIRST_CHAR, FINAL_CHAR);
-            DrawBar(new CharCoord(0, TOP_BAR_H), WIN_W, LEFT_T, RIGHT_T); 
-            DrawPipe(new CharCoord(SIDE_BAR_W, 0), WIN_H, TOP_T, BOT_T);  
-            WriteAt(CROSS, SIDE_BAR_W, TOP_BAR_H);                        
-            DrawBar(new CharCoord(SIDE_BAR_W, WIN_H - 3), WIN_W - SIDE_BAR_W, LEFT_T, RIGHT_T);
-            DrawBar(new CharCoord(0, SIDE_BAR_W + 6), SIDE_BAR_W + 1, LEFT_T, RIGHT_T);
-            CursorCoords = CURSOR_WRITE;
+            DrawBar(new (0, TOP_BAR_H), WIN_W, LEFT_T, RIGHT_T);
+            DrawPipe(new (SIDE_BAR_W, 0), WIN_H, TOP_T, BOT_T);
+            _engine.WriteText(new(SIDE_BAR_W, TOP_BAR_H), CROSS);
+            DrawBar(new (SIDE_BAR_W, WIN_H - 3), WIN_W - SIDE_BAR_W, LEFT_T, RIGHT_T);
+            DrawBar(new (0, SIDE_BAR_W + 6), SIDE_BAR_W + 1, LEFT_T, RIGHT_T);
+            Refresh();
         }
 
-        public static void Out(string[] msgs)
+        public static void Clear()
         {
-            CursorCoords = CURSOR_WRITE;
-            for(var i = 0; i < msgs.Length; ++i)
+            _engine.ClearBuffer();
+        }
+
+        public static void Refresh()
+        {
+            _engine.DisplayBuffer();
+        }
+
+        public static void Out(ICollection<string> msgs)
+        {
+            for(var i = 0; i < msgs.Count; ++i)
             {
-                Write(msgs[i]);
-                ClearLineToBorder();
-                SetCursorPosition(CURSOR_WRITE.x, CURSOR_WRITE.y + i + 1);
-                ReadLine();
-                SetCursorPosition(CURSOR_WRITE.x, CURSOR_WRITE.y + i + 1);
+                Write(msgs.ElementAt(i));
+                SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + i + 1);
+                Read();
+                SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + i + 1);
             }
+        }
+
+        public static void ClearOutputPane()
+        {
+            _engine.Fill(OUTPUT_PANE_START, OUTPUT_PANE_END, Colors.Black);
         }
 
         public static Choice Out(string msg, bool requiresInput = false)
         {
-            CursorCoords = CURSOR_WRITE;
-            Write(msg);
-            ClearLineToBorder();
+            ClearOutputPane();
+            _engine.WriteText(CURSOR_WRITE, msg);
+            Refresh();
             if(!requiresInput)
             {
-                SetCursorPosition(CURSOR_WRITE.x, CURSOR_WRITE.y + 1);
-                var garbage = ReadLine();
-                CursorCoords = CURSOR_HOME;
-                return new Choice(garbage);
+                SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + 1);
+                return new Choice(string.Empty);
             }
-            CursorCoords = CURSOR_HOME;
+
             var response = ReadLine();
             while(string.IsNullOrEmpty(response))
             {
-                CursorCoords = CURSOR_HOME;
                 response = ReadLine();
             }
             ResetInputField();
@@ -101,25 +105,21 @@ namespace TurnBasedGame
 
         public static Choice Out(string msg, string[] options)
         {
-            CursorCoords = CURSOR_WRITE;
+            ClearOutputPane();
             Write(msg);
-            LoopChar(SPACE, WIN_W - SIDE_BAR_W - msg.Length - 5);
             for(var i = 0; i < options.Length; ++i)
             {
-                SetCursorPosition(CURSOR_WRITE.x, CURSOR_WRITE.y + i + 1);
+                SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + i + 1);
                 Write($"[{i + 1}] {options[i]}");
-                ClearLineToBorder();
             }
-            CursorCoords = CURSOR_HOME;
             var choice = 0;
             while(choice == 0)
             {
-                CursorCoords = CURSOR_HOME;
                 if(int.TryParse(ReadKey().KeyChar.ToString(), out choice))
                 {
                     if(choice != 0 && choice <= options.Length)
                     {
-                        ResetInputField();
+                        //ResetInputField();
                         return new Choice(options[choice - 1], choice);
                     }
                     choice = 0;
@@ -128,200 +128,142 @@ namespace TurnBasedGame
             throw new Exception("WTF?");
         }
 
-        public static Choice Out(string msg, char[] options)
-        {
-            CursorCoords = CURSOR_WRITE;
-            Write(msg);
-            ClearLineToBorder();
-            for(var i = 0; i < options.Length; ++i)
-            {
-                Write($"{options[i]}");
-                ClearLineToBorder();
-            }
-            CursorCoords = CURSOR_HOME;
-            char choice = ReadKey().KeyChar;
-            while(!options.Contains(choice))
-            {
-                CursorCoords = CURSOR_HOME;
-                choice = ReadKey().KeyChar;
-            }
-            ResetInputField();
-            return new Choice(choice.ToString());
-        }
+        //public static Choice Out(string msg, char[] options)
+        //{
+        //    CursorCoords = CURSOR_WRITE;
+        //    Write(msg);
+        //    ClearLineToBorder();
+        //    for(var i = 0; i < options.Length; ++i)
+        //    {
+        //        Write($"{options[i]}");
+        //        ClearLineToBorder();
+        //    }
+        //    CursorCoords = CURSOR_HOME;
+        //    char choice = ReadKey().KeyChar;
+        //    while(!options.Contains(choice))
+        //    {
+        //        CursorCoords = CURSOR_HOME;
+        //        choice = ReadKey().KeyChar;
+        //    }
+        //    ResetInputField();
+        //    return new Choice(choice.ToString());
+        //}
 
         public static Choice Out(string msg, Dictionary<char, string> options)
         {
-            CursorCoords = CURSOR_WRITE;
-            Write(msg);
-            ClearLineToBorder();
+            ClearOutputPane();
+            _engine.WriteText(CURSOR_WRITE, msg);
             var i = 1;
             foreach(var option in options)
             {
-                SetCursorPosition(CURSOR_WRITE.x, CURSOR_WRITE.y + i++);
-                Write($"[{option.Key.ToString().ToUpper()[0]}] {option.Value}");
-                ClearLineToBorder();
+                var text = $"[{option.Key.ToString().ToUpperInvariant()}] {option.Value}";
+                _engine.WriteText(new(CURSOR_WRITE.X, CURSOR_WRITE.Y + i), text);
+                i++;
             }
-            CursorCoords = CURSOR_HOME;
-            var choice = 'x';
-            while(choice == 'x')
+            Refresh();
+
+            var choice = '+';
+            while(choice == '+')
             {
-                CursorCoords = CURSOR_HOME;
+                ResetInputField();
                 choice = ReadKey().KeyChar;
-            
+
                 if(options.Keys.Contains(choice))
                 {
                     ResetInputField();
                     return new Choice(options[choice], choice);
                 }
-                choice = 'x';
+                choice = '+';
             }
             throw new Exception("WTF?");
         }
 
-        public static void SetTextColor(ConsoleColor color)
+        public static void SetCursorForInput()
         {
-            currentColor = color;
-            ForegroundColor = color;
+            SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y);
         }
 
         public static void ResetInputField()
         {
-            CursorCoords = CURSOR_HOME;
-            LoopChar(SPACE, WIN_W - SIDE_BAR_W - 3);
-            CursorCoords = CURSOR_HOME;
+            var blanks = ' '.Repeat(WIN_W - SIDE_BAR_W - 3);
+            _engine.WriteText(CURSOR_WRITE, blanks);
+            Refresh();
+            SetCursorForInput();
         }
 
-        public static void UpdateName(string name)
+        public static void UpdatePlayerInfo(Player player)
         {
-            WriteAt(name, NAME_SLOT);
-            CursorCoords = CURSOR_HOME;
+            var levelChar = Convert.ToChar(10101 + player.Level);
+            _engine.WriteText(NAME_SLOT, $"{levelChar}  {player.Name}");
+            var xpBlocksFull = player.GetXpAsPercent() / 10;
+            _engine.WriteText(XP_SLOT, $"XP{'▰'.Repeat(xpBlocksFull)}{'▱'.Repeat(10 - xpBlocksFull)}");
+            var healthBlocksFull = player.GetHealthAsPercent() / 10;
+            _engine.WriteText(HP_SLOT, $"HP{'▰'.Repeat(healthBlocksFull)}{'▱'.Repeat(10 - healthBlocksFull)}");
+            Refresh();
         }
 
-        public static void UpdateLevel(int level)
-        {
-            WriteAt($"Lvl: {level}", LEVEL_SLOT);
-            CursorCoords = CURSOR_HOME;
-        }
-
-        public static void UpdateMap()
+        public static void UpdateMap(World world, Coord playerCoord)
         {
             for(var y = -4; y <= 4; ++y)
             {
-                CursorCoords = new CharCoord(MAP_CENTRE.x - 4, MAP_CENTRE.y + y);
                 for(var x = -4; x <= 4; ++x)
                 {
-                    var mapCoord = new Coord(Game.Instance.CurrentCoord.x + x, Game.Instance.CurrentCoord.y + y);
-                    if(Game.Instance.World.OffTheWorld(mapCoord) || !Game.Instance.World[mapCoord].Discovered)
+                    var drawPoint = new Point(MAP_CENTRE.X - x, MAP_CENTRE.Y + y);
+                    var mapCoord = new Coord(playerCoord.X - x, playerCoord.Y + y);
+                    if(world.CoordIsOffWorld(mapCoord) || !world[mapCoord].Discovered)
                     {
-                        Write(SPACE);
+                        _engine.WriteText(drawPoint, SPACE);
                     }
                     else
                     {
-                        Write(Game.Instance.World[mapCoord].ToChar());
+                        _engine.WriteText(drawPoint, world[mapCoord].ToChar());
                     }
                 }
             }
-            WriteAt('☺', MAP_CENTRE);
+            _engine.WriteText(MAP_CENTRE, '☺');
+            Refresh();
         }
 
         public static void ClearOutputField(bool preserveHeader = false)
         {
-            FillRect(SPACE, preserveHeader ? CURSOR_HOME : CURSOR_HEADER, new CharCoord(WIN_W - 1, WIN_H - 3));
+            //FillRect(SPACE, preserveHeader ? CURSOR_HOME : CURSOR_HEADER, new CharCoord(WIN_W - 1, WIN_H - 3));
         }
 
-        private static void WriteAt(char c, int x, int y)
+        private static void DrawPipe(Point start, int height, char startCap = PIPE, char endCap = PIPE, int color = Colors.White)
         {
-            SetCursorPosition(x, y);
-            Write(c);
-        }
-
-        private static void WriteAt(string s, int x, int y)
-        {
-            SetCursorPosition(x, y);
-            Write(s);
-        }
-
-        private static void WriteAt(char c, CharCoord cc)
-        {
-            SetCursorPosition(cc.x, cc.y);
-            Write(c);
-        }
-
-        private static void WriteAt(string s, CharCoord cc)
-        {
-            SetCursorPosition(cc.x, cc.y);
-            Write(s);
-        }
-
-        private static void DrawPipe(CharCoord start, int height, char startCap = PIPE, char endCap = PIPE, ConsoleColor color = ConsoleColor.White)
-        {
-            ForegroundColor = color;
-            WriteAt(startCap, start.x, start.y);
-            SetCursorPosition(start.x, start.y + 1);
-            LoopChar(PIPE, height - 2, true);
-            WriteAt(endCap, start.x, start.y + height - 1);
-            ForegroundColor = currentColor;
-        }
-
-        private static void DrawBar(CharCoord start, int width, char startCap = BAR, char endCap = BAR, ConsoleColor color = ConsoleColor.White)
-        {
-            ForegroundColor = color;
-            WriteAt(startCap, start.x, start.y);
-            LoopChar(BAR, width - 2);
-            Write(endCap);
-            ForegroundColor = currentColor;
-        }
-
-        private static void DrawRect(CharCoord start, CharCoord end, ConsoleColor color = ConsoleColor.White)
-        {
-            DrawBar(start, end.x - start.x + 1, TOP_LEFT, TOP_RIGHT, color);
-            DrawPipe(start, end.y - start.y + 1, TOP_LEFT, BOT_LEFT, color);
-            DrawPipe(new CharCoord(end.x, start.y), end.y - start.y + 1, TOP_RIGHT, BOT_RIGHT, color);
-            DrawBar(new CharCoord(start.x, end.y), end.x - start.x + 1, BOT_LEFT, BOT_RIGHT, color);
-        }
-
-        private static void FillRect(char c, CharCoord start, CharCoord end, ConsoleColor color = ConsoleColor.White)
-        {
-            CursorCoords = start;
-            ForegroundColor = color;
-            var width = end.x - start.x;
-            var height = end.y - start.y;
-            for(int i = 1; i <= height; ++i)
+            _engine.WriteText(start, startCap, color);
+            for(var i = 1; i < height - 1; ++i)
             {
-                LoopChar(c, width);
-                SetCursorPosition(start.x, start.y + i);
+                _engine.WriteText(new(start.X, start.Y + i), PIPE, color);
             }
-            ForegroundColor = currentColor;
+            _engine.WriteText(new(start.X, start.Y + height), endCap, color);
         }
 
-        private static void ClearLineToBorder()
+        private static void DrawBar(Point start, int width, char startCap = BAR, char endCap = BAR, int color = Colors.White)
         {
-            for(int i = CursorLeft; i < WIN_W - 1; ++i)
-            {
-                Write(SPACE);
-            }
+            _engine.WriteText(start, startCap, color);
+            _engine.WriteText(new(start.X + 1, start.Y), BAR.Repeat(width - 2), color);
+            _engine.WriteText(new(start.X + width, start.Y), endCap, color);
         }
 
-        private static void LoopChar(char c, int n, bool vertical = false)
+        private static void DrawRect(Point start, Point end, int color = Colors.White)
         {
-            if(vertical)
-            {
-                var init_x = CursorCoords.x;
-                for(var i = 0; i < n; ++i)
-                {
-                    Write(c);
-                    SetCursorPosition(init_x, CursorTop + 1);
-                }
-            }
-            else for(var i = 0; i < n; ++i) Write(c);
+            DrawBar(start, end.X - start.X + 1, TOP_LEFT, TOP_RIGHT, color);
+            DrawPipe(start, end.Y - start.Y + 1, TOP_LEFT, BOT_LEFT, color);
+            DrawPipe(new (end.X, start.Y), end.Y - start.Y + 1, TOP_RIGHT, BOT_RIGHT, color);
+            DrawBar(new (start.X, end.Y), end.X - start.X + 1, BOT_LEFT, BOT_RIGHT, color);
+            _engine.WriteText(end, BOT_RIGHT, color); //this _shouldn't be needed, but is ...
         }
 
-        private static CharCoord CursorCoords
-        {
-            get => new CharCoord(CursorLeft, CursorTop);
-            set => SetCursorPosition(value.x, value.y);
-        }
+        //private static void ClearLineToBorder()
+        //{
+        //    for(int i = CursorLeft; i < WIN_W - 1; ++i)
+        //    {
+        //        Write(SPACE);
+        //    }
+        //}
 
+        [DebuggerDisplay("{x},{y}")]
         private struct CharCoord
         {
             public int x;
@@ -333,12 +275,32 @@ namespace TurnBasedGame
                 this.y = y;
             }
         }
+#if DEBUG
+        public static class Debug
+        {
+            public static void DumpMap(World world)
+            {
+                var topLeftX = WIN_W - 2 - world.Width;
+                var topLeftY = WIN_H - 3 - world.Height;
+                for(var x = 0; x < world.Width; ++x)
+                {
+                    for(var y = 0; y < world.Height; ++y)
+                    {
+                        var drawPoint = new Point(topLeftX + x, topLeftY + y);
+                        _engine.WriteText(drawPoint, world.Tiles[x, y].ToChar());
+                    }
+                }
+                Refresh();
+            }
+        }
+#endif
     }
+
     public class Choice
     {
         private int int_val;
         private string str_val;
-        private Direction? dir_val => Enum.IsDefined(typeof(Direction), int_val) ? (Direction) int_val : (Direction?) null;
+        private Direction? dir_val => Enum.IsDefined(typeof(Direction), int_val) ? (Direction) int_val : null;
 
         public Choice(string s, int i = 0)
         {
@@ -346,8 +308,9 @@ namespace TurnBasedGame
             int_val = i;
         }
 
-        public static implicit operator int (Choice c) => c.int_val;
-        public static implicit operator string (Choice c) => c.str_val;
-        public static implicit operator Direction? (Choice c) => c.dir_val;
+        public static implicit operator char(Choice c) => c.str_val[0];
+        public static implicit operator int(Choice c) => c.int_val;
+        public static implicit operator string(Choice c) => c.str_val;
+        public static implicit operator Direction?(Choice c) => c.dir_val;
     }
 }
