@@ -176,8 +176,7 @@ namespace Roguelike.Runners
         public static string GetInput()
         {
             var input = string.Empty;
-            var press = Console.ReadKey();
-            while(press.Key != ConsoleKey.Enter)
+            for(var press = Console.ReadKey(); press.Key != ConsoleKey.Enter; press = Console.ReadKey())
             {
                 if(press.Key == ConsoleKey.Backspace && input.Length > 0)
                 {
@@ -188,7 +187,6 @@ namespace Roguelike.Runners
                     input += press.KeyChar;
                 }
                 ResetInputField(input);
-                press = Console.ReadKey();
             }
             ResetInputField();
             return input;
