@@ -31,36 +31,46 @@ namespace Roguelike
         public void Start()
         {
             World.Init();
+            ConsoleRunner.UpdateMap(World, CurrentCoord);
             MainLoop();
         }
-
+        
         public void MainLoop()
         {
-            while(true)
+            var quit = false;
+            for(CurrentTurnNumber = 1L; !quit; CurrentTurnNumber++)
             {
-                var messages = new List<string>();
-                ConsoleRunner.UpdateMap(World, CurrentCoord);
-                var travelDirection = GetTravelDirection(World[CurrentCoord]);
+                //Move
+                var travelDirection = GetTravelDirection();
                 var newTile = World.EnterNeighbor(travelDirection);
-                messages.Add(newTile.Blurb);
+                
+                //Draw
+                ConsoleRunner.UpdateMap(World, CurrentCoord);
+
+                //Output
+                var messages = new List<string>
+                {
+                    newTile.Blurb
+                };
                 if(newTile.TurnFirstEnterred == CurrentTurnNumber)
                 {
                     Player.Experience += 1;
                     messages.Add("You gain 1xp for exploring a new area.");
                 }
                 ConsoleRunner.Out(messages);
+
+                //Update
                 ConsoleRunner.UpdatePlayerInfo(Player);
-                CurrentTurnNumber++;
-                //if(CurrentTurnNumber % 5 == 0)
-                //{
-                //    //autosave while testing
-                //    DataRunner.SaveGameStateToDisk(this, "test.sav");
-                //}
             }
         }
 
-        public World.Direction GetTravelDirection(Tile current)
+        /// <summary>
+        /// Outputs options for travel direction and awaits player input
+        /// </summary>
+        /// <returns>Players's selected direction of travel</returns>
+        public World.Direction GetTravelDirection()
         {
+            var current = World[CurrentCoord];
             var choice = ConsoleRunner.Out("Travel?", new Dictionary<char, string>() {
                 { DirectionToInputChar(World.Direction.North), current.GetTravelPrompt(World.Direction.North) },
                 { DirectionToInputChar(World.Direction.East), current.GetTravelPrompt(World.Direction.East) },

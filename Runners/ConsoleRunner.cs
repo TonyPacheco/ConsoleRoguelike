@@ -5,7 +5,7 @@ using static Roguelike.World;
 using Roguelike.Engine;
 using Roguelike.Engine.Extensions;
 
-namespace Roguelike
+namespace Roguelike.Runners
 {
     public static class ConsoleRunner
     {
