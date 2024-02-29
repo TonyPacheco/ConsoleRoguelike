@@ -17,7 +17,10 @@ namespace Roguelike.Runners
         private static readonly Point OUTPUT_PANE_END = new(WIN_W - 1, WIN_H - 4);
         private static readonly Point CURSOR_INPUT = new (SIDE_BAR_W + 2, WIN_H - 2);
         private static readonly Point CURSOR_WRITE = new (SIDE_BAR_W + 4, TOP_BAR_H + 2);
-        private static readonly Point CURSOR_HEADER = new (SIDE_BAR_W + 4, TOP_BAR_H + 1);
+        private static readonly Point HEADER_PANE_START = new (SIDE_BAR_W + 1, 1);
+        private static readonly Point HEADER_PANE_END = new (WIN_W - 1, 3);
+        private static readonly Point CURSOR_HEADER_TOP = new (SIDE_BAR_W + 4, TOP_BAR_H - 2);
+        private static readonly Point CURSOR_HEADER_BTM = new (SIDE_BAR_W + 4, TOP_BAR_H - 1);
         private static readonly Point NAME_SLOT = new (2, 1);
         private static readonly Point XP_SLOT = new (2, 2);
         private static readonly Point HP_SLOT = new (15, 2);
@@ -66,7 +69,18 @@ namespace Roguelike.Runners
             _engine.DisplayBuffer();
         }
 
-        public static void Out(ICollection<string> msgs)
+        public static void WriteHeader(string topMsg, string btmMsg)
+        {
+            _engine.Fill(HEADER_PANE_START, HEADER_PANE_END, Colors.Black);
+            _engine.WriteText(CURSOR_HEADER_TOP, topMsg);
+            _engine.WriteText(CURSOR_HEADER_BTM, btmMsg);
+            Refresh();
+        }
+
+        /// <summary>
+        /// Writes a series of messages, with a pause awaiting a player key press between each if <paramref name="pauseBetweenMsgs"/> which defaults to true
+        /// </summary>
+        public static void Out(ICollection<string> msgs, bool pauseBetweenMsgs = true)
         {
             ClearOutputPane();
             for(var i = 0; i < msgs.Count; ++i)
@@ -74,15 +88,22 @@ namespace Roguelike.Runners
                 var writePoint = new Point(CURSOR_WRITE.X, CURSOR_WRITE.Y + i);
                 _engine.WriteText(writePoint, msgs.ElementAt(i));
                 Refresh();
+                if(pauseBetweenMsgs)
+                {
+                    Console.Read();
+                }
+            }
+            if(!pauseBetweenMsgs)
+            {
+                // no pause between, but a final pause, otherwise the player would never see the output
                 Console.Read();
             }
         }
 
-        public static void ClearOutputPane()
-        {
-            _engine.Fill(OUTPUT_PANE_START, OUTPUT_PANE_END, Colors.Black);
-        }
-
+        /// <summary>
+        /// Writes a prompt and if <paramref name="requiresInput"/> gets input back from the player
+        /// </summary>
+        /// <returns>Choice with string value matching the input from the player, or an empty Choice if none was required</returns>
         public static Choice Out(string msg, bool requiresInput = false)
         {
             ClearOutputPane();
@@ -93,10 +114,14 @@ namespace Roguelike.Runners
                 return new Choice(string.Empty);
             }
 
-            var response = GetInput();
+            var response = GetStringInput();
             return new Choice(response);
         }
 
+        /// <summary>
+        /// Writes a prompt and a list of options, with each option selectable via number press eg. [1] OPTION ONE
+        /// </summary>
+        /// <returns>Choice with int value matching the number pressed by the player</returns>
         public static Choice Out(string msg, string[] options)
         {
             ClearOutputPane();
@@ -107,43 +132,17 @@ namespace Roguelike.Runners
                 _engine.WriteText(writePoint, $"[{i + 1}] {options[i]}");
             }
             Refresh();
-            var choice = 0;
-            while(choice == 0)
-            {
-                if(int.TryParse(Console.ReadKey().KeyChar.ToString(), out choice))
-                {
-                    if(choice != 0 && choice <= options.Length)
-                    {
-                        ResetInputField();
-                        return new Choice(options[choice - 1], choice);
-                    }
-                    choice = 0;
-                }
-            }
-            throw new Exception("WTF?");
+
+            var validChoices = Enumerable.Range(1, options.Length).Select(n => n.ToString()[0]);
+            var choice = GetCharInput(validChoices);
+            var choiceInt = int.Parse(choice.ToString());
+            return new Choice(options[choiceInt - 1], choiceInt);
         }
 
-        //public static Choice Out(string msg, char[] options)
-        //{
-        //    CursorCoords = CURSOR_WRITE;
-        //    Write(msg);
-        //    ClearLineToBorder();
-        //    for(var i = 0; i < options.Length; ++i)
-        //    {
-        //        Write($"{options[i]}");
-        //        ClearLineToBorder();
-        //    }
-        //    CursorCoords = CURSOR_HOME;
-        //    char choice = ReadKey().KeyChar;
-        //    while(!options.Contains(choice))
-        //    {
-        //        CursorCoords = CURSOR_HOME;
-        //        choice = ReadKey().KeyChar;
-        //    }
-        //    ResetInputField();
-        //    return new Choice(choice.ToString());
-        //}
-
+        /// <summary>
+        /// Writes a prompt and a list of options, with each option selectable via mapped key press eg. [W] GO WEST
+        /// </summary>
+        /// <returns>Choice with char value matching the character pressed by the player</returns>
         public static Choice Out(string msg, Dictionary<char, string> options)
         {
             ClearOutputPane();
@@ -157,23 +156,34 @@ namespace Roguelike.Runners
             }
             Refresh();
 
-            var choice = '+';
-            while(choice == '+')
-            {
-                ResetInputField();
-                choice = Console.ReadKey().KeyChar;
-
-                if(options.Keys.Contains(choice))
-                {
-                    ResetInputField();
-                    return new Choice(options[choice], choice);
-                }
-                choice = '+';
-            }
-            throw new Exception("WTF?");
+            var choice = GetCharInput(options.Keys);
+            return new Choice(options[choice], choice);
         }
 
-        public static string GetInput()
+        public static void ClearOutputPane()
+        {
+            _engine.Fill(OUTPUT_PANE_START, OUTPUT_PANE_END, Colors.Black);
+        }
+
+        public static char GetCharInput(IEnumerable<char>? validOptions = null)
+        {
+            if(validOptions == null)
+            {
+                //anything is valid
+                return Console.ReadKey().KeyChar;
+            }
+
+            while(true)
+            {
+                var choice = Console.ReadKey().KeyChar;
+                if(validOptions.Contains(choice))
+                {
+                    return choice;
+                }
+            }
+        }
+
+        public static string GetStringInput()
         {
             var input = string.Empty;
             for(var press = Console.ReadKey(); press.Key != ConsoleKey.Enter; press = Console.ReadKey())
@@ -203,6 +213,9 @@ namespace Roguelike.Runners
             Refresh();
         }
 
+        /// <summary>
+        /// Updates player info with name and level; level is drawn using unicode number balls because I think they're neat
+        /// </summary>
         public static void UpdatePlayerInfo(Player player)
         {
             var levelChar = Convert.ToChar(10101 + player.Level);
@@ -214,6 +227,9 @@ namespace Roguelike.Runners
             Refresh();
         }
 
+        /// <summary>
+        /// Draws the mini-map as a 9x9 grid around the players current position
+        /// </summary>
         public static void UpdateMap(World world, Coord playerCoord)
         {
             for(var y = -4; y <= 4; ++y)
@@ -320,7 +336,7 @@ namespace Roguelike.Runners
             int_val = i;
         }
 
-        public static implicit operator char(Choice c) => c.str_val[0];
+        public static implicit operator char(Choice c) => (char) c.int_val;
         public static implicit operator int(Choice c) => c.int_val;
         public static implicit operator string(Choice c) => c.str_val;
         public static implicit operator Direction?(Choice c) => c.dir_val;
