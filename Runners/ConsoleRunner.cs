@@ -90,16 +90,10 @@ namespace Roguelike.Runners
             Refresh();
             if(!requiresInput)
             {
-                //SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y + 1);
                 return new Choice(string.Empty);
             }
 
-            var response = Console.ReadLine();
-            while(string.IsNullOrEmpty(response))
-            {
-                response = Console.ReadLine();
-            }
-            ResetInputField();
+            var response = GetInput();
             return new Choice(response);
         }
 
@@ -179,9 +173,30 @@ namespace Roguelike.Runners
             throw new Exception("WTF?");
         }
 
+        public static string GetInput()
+        {
+            var input = string.Empty;
+            var press = Console.ReadKey();
+            while(press.Key != ConsoleKey.Enter)
+            {
+                if(press.Key == ConsoleKey.Backspace && input.Length > 0)
+                {
+                    input = input[..^1];
+                }
+                else
+                {
+                    input += press.KeyChar;
+                }
+                ResetInputField(input);
+                press = Console.ReadKey();
+            }
+            ResetInputField();
+            return input;
+        }
+
         public static void SetCursorForInput()
         {
-            Console.SetCursorPosition(CURSOR_WRITE.X, CURSOR_WRITE.Y);
+            Console.SetCursorPosition(CURSOR_INPUT.X, CURSOR_INPUT.Y);
         }
 
         public static void ResetInputField()
@@ -189,7 +204,14 @@ namespace Roguelike.Runners
             var blanks = ' '.Repeat(WIN_W - SIDE_BAR_W - 4);
             _engine.WriteText(CURSOR_INPUT, blanks);
             Refresh();
-            SetCursorForInput();
+        }
+
+        public static void ResetInputField(string newInput)
+        {
+            var blanks = ' '.Repeat(WIN_W - SIDE_BAR_W - 4);
+            _engine.WriteText(CURSOR_INPUT, blanks);
+            _engine.WriteText(CURSOR_INPUT, newInput);
+            Refresh();
         }
 
         public static void UpdatePlayerInfo(Player player)

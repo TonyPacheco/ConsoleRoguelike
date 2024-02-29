@@ -1,4 +1,6 @@
-﻿namespace Roguelike
+﻿using Roguelike.Runners;
+
+namespace Roguelike
 {
     public class Player : Combatant
     {
@@ -16,15 +18,14 @@
         public Accessory Acc2;
         public Accessory Acc3;
 
-        //public static Player ConsoleCreate()
-        //{
-        //    var p = new Player();
-        //    p.Name = ConsoleRunner.Out("Welcome Adventurer, what's your name?", true);
-        //    ConsoleRunner.UpdateName(p.Name);
-        //    ConsoleRunner.UpdateLevel(0);
-        //    return p;
-        //}
-
+        public static Player ConsoleCreate()
+        {
+            var name = ConsoleRunner.Out("Welcome Adventurer, what's your name?", true);
+            return new Player
+            {
+                Name = name
+            };
+        }
 
         public Player()
         {
