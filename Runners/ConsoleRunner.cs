@@ -3,6 +3,8 @@ using ConsoleGameEngine;
 using static Roguelike.World;
 using Roguelike.Engine;
 using Roguelike.Engine.Extensions;
+using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Roguelike.Runners
 {
@@ -80,7 +82,7 @@ namespace Roguelike.Runners
         /// <summary>
         /// Writes a series of messages, with a pause awaiting a player key press between each if <paramref name="pauseBetweenMsgs"/> which defaults to true
         /// </summary>
-        public static void Out(ICollection<string> msgs, bool pauseBetweenMsgs = true)
+        public static void Write(ICollection<string> msgs, bool pauseBetweenMsgs = true)
         {
             ClearOutputPane();
             for(var i = 0; i < msgs.Count; ++i)
@@ -101,63 +103,41 @@ namespace Roguelike.Runners
         }
 
         /// <summary>
-        /// Writes a prompt and if <paramref name="requiresInput"/> gets input back from the player
+        /// Writes a prompt and gets string input back from the player
         /// </summary>
-        /// <returns>Choice with string value matching the input from the player, or an empty Choice if none was required</returns>
-        public static Choice Out(string msg, bool requiresInput = false)
+        /// <returns>Choice with string value matching the input from the player</returns>
+        public static Choice Prompt(string msg)
         {
             ClearOutputPane();
             _engine.WriteText(CURSOR_WRITE, msg);
             Refresh();
-            if(!requiresInput)
-            {
-                return new Choice(string.Empty);
-            }
-
             var response = GetStringInput();
             return new Choice(response);
         }
 
         /// <summary>
-        /// Writes a prompt and a list of options, with each option selectable via number press eg. [1] OPTION ONE
+        /// Writes a prompt and gets a choice of the options back from the player
         /// </summary>
-        /// <returns>Choice with int value matching the number pressed by the player</returns>
-        public static Choice Out(string msg, string[] options)
+        /// <returns>Choice with int value matching the input from the player, and string value matching the text of of the option selected</returns>
+        public static Choice Prompt(string msg, OptionGroup options)
         {
             ClearOutputPane();
             _engine.WriteText(CURSOR_WRITE, msg);
-            for(var i = 0; i < options.Length; ++i)
+            foreach(var (option, index) in options)
             {
-                var writePoint = new Point(CURSOR_WRITE.X, CURSOR_WRITE.Y + i + 1);
-                _engine.WriteText(writePoint, $"[{i + 1}] {options[i]}");
+                var writePoint = new Point(CURSOR_WRITE.X, CURSOR_WRITE.Y + index + 1);
+                _engine.WriteText(writePoint, option.Display);
             }
             Refresh();
 
-            var validChoices = Enumerable.Range(1, options.Length).Select(n => n.ToString()[0]);
-            var choice = GetCharInput(validChoices);
-            var choiceInt = int.Parse(choice.ToString());
-            return new Choice(options[choiceInt - 1], choiceInt);
-        }
-
-        /// <summary>
-        /// Writes a prompt and a list of options, with each option selectable via mapped key press eg. [W] GO WEST
-        /// </summary>
-        /// <returns>Choice with char value matching the character pressed by the player</returns>
-        public static Choice Out(string msg, Dictionary<char, string> options)
-        {
-            ClearOutputPane();
-            _engine.WriteText(CURSOR_WRITE, msg);
-            var i = 1;
-            foreach(var option in options)
+            while(true)
             {
-                var text = $"[{option.Key.ToString().ToUpperInvariant()}] {option.Value}";
-                _engine.WriteText(new(CURSOR_WRITE.X, CURSOR_WRITE.Y + i), text);
-                i++;
+                var choice = Console.ReadKey().KeyChar;
+                if(options.TrySelectOption(choice, out var selected))
+                {
+                    return new Choice(selected);
+                }
             }
-            Refresh();
-
-            var choice = GetCharInput(options.Keys);
-            return new Choice(options[choice], choice);
         }
 
         public static void ClearOutputPane()
@@ -252,11 +232,6 @@ namespace Roguelike.Runners
             Refresh();
         }
 
-        public static void ClearOutputField(bool preserveHeader = false)
-        {
-            //FillRect(SPACE, preserveHeader ? CURSOR_HOME : CURSOR_HEADER, new CharCoord(WIN_W - 1, WIN_H - 3));
-        }
-
         private static void DrawPipe(Point start, int height, char startCap = PIPE, char endCap = PIPE, int color = Colors.White)
         {
             _engine.WriteText(start, startCap, color);
@@ -282,14 +257,6 @@ namespace Roguelike.Runners
             DrawBar(new (start.X, end.Y), end.X - start.X + 1, BOT_LEFT, BOT_RIGHT, color);
             _engine.WriteText(end, BOT_RIGHT, color); //this _shouldn't be needed, but is ...
         }
-
-        //private static void ClearLineToBorder()
-        //{
-        //    for(int i = CursorLeft; i < WIN_W - 1; ++i)
-        //    {
-        //        Write(SPACE);
-        //    }
-        //}
 
         [DebuggerDisplay("{x},{y}")]
         private struct CharCoord
@@ -336,9 +303,66 @@ namespace Roguelike.Runners
             int_val = i;
         }
 
+        public Choice(Option selected)
+        {
+            str_val = selected.Text;
+            int_val = selected.Selector;
+        }
+
         public static implicit operator char(Choice c) => (char) c.int_val;
         public static implicit operator int(Choice c) => c.int_val;
         public static implicit operator string(Choice c) => c.str_val;
         public static implicit operator Direction?(Choice c) => c.dir_val;
+    }
+
+    public class Option
+    {
+        public string Text { get; private set; }
+        public char Selector { get; private set; }
+
+        public string Display => $"[{Selector.ToString().ToUpperInvariant()}] {Text}";
+
+        public Option(string text, char selector)
+        {
+            Selector = selector;
+            Text = text;
+        }
+
+        public Option(string text, int selector)
+        {
+            Selector = selector.ToString()[0];
+            Text = text;
+        }
+
+        public bool Selected(char input)
+        {
+            return Selector == input;
+        }
+    }
+
+    public class OptionGroup : IEnumerable<(Option Option, int Index)>
+    {
+        public IEnumerable<(Option Option, int Index)> Options { get; private set; }
+        public Dictionary<char, Option> OptionsKeyed { get; private set; }
+
+        public OptionGroup(IEnumerable<Option> options)
+        {
+            Options = options.Select((o, i) => (o, i));
+            OptionsKeyed = options.ToDictionary(o => o.Selector);
+        }
+
+        public OptionGroup(IEnumerable<string> options)
+        {
+            Options = options.Select((o, i) => (new Option(o, i), i));
+            OptionsKeyed = Options.ToDictionary(o => o.Option.Selector, o => o.Option);
+        }
+
+        public bool TrySelectOption(char input, [NotNullWhen(true)] out Option? selected)
+        {
+            return OptionsKeyed.TryGetValue(input, out selected);
+        }
+
+        public IEnumerator<(Option Option, int Index)> GetEnumerator() => Options.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => Options.GetEnumerator();
     }
 }

@@ -31,7 +31,7 @@ namespace Roguelike
             { TileType.City, "A bustling city, stone walls and tall towers with squat row houses at their bases." },
             { TileType.Town, "A quaint town with a single main street and a few off shooting alleys." },
             { TileType.Forest, "Tall green trees and short green bushes, it's awfully foresty around." },
-            { TileType.Plains, "Cart paths and migration trails cross the green and gold plains crossed and crissed." },
+            { TileType.Plains, "Cart paths and migration trails cross the green and gold plains." },
             { TileType.Camp, "A single wisp of smoke rises slowly from beside a worn canvas lean-to." },
             { TileType.Hills, "Softly undulatintg peaks and valleys for acres." },
             { TileType.Farm, "The fields here are squared and fenced, it's a farm alright." },

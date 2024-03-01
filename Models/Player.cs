@@ -20,7 +20,7 @@ namespace Roguelike
 
         public static Player ConsoleCreate()
         {
-            var name = ConsoleRunner.Out("Welcome Adventurer, what's your name?", true);
+            var name = ConsoleRunner.Prompt("Welcome Adventurer, what's your name?");
             return new Player
             {
                 Name = name

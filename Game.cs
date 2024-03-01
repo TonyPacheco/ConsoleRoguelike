@@ -59,7 +59,7 @@ namespace Roguelike
                     messages.Add("You gain 1xp for exploring a new area.");
                 }
                 UpdateCurrentLocationOutput();
-                ConsoleRunner.Out(messages, false);
+                ConsoleRunner.Write(messages, false);
 
                 //Update
                 ConsoleRunner.UpdatePlayerInfo(Player);
@@ -78,14 +78,21 @@ namespace Roguelike
         /// <returns>Players's selected direction of travel</returns>
         public World.Direction GetTravelDirection()
         {
-            var current = World[CurrentCoord];
-            var choice = ConsoleRunner.Out("Travel?", new Dictionary<char, string>() {
-                { DirectionToInputChar(World.Direction.North), current.GetTravelPrompt(World.Direction.North) },
-                { DirectionToInputChar(World.Direction.East), current.GetTravelPrompt(World.Direction.East) },
-                { DirectionToInputChar(World.Direction.South), current.GetTravelPrompt(World.Direction.South) },
-                { DirectionToInputChar(World.Direction.West), current.GetTravelPrompt(World.Direction.West) },
+            var options = new OptionGroup(new Option[]
+            {
+                GetTravelOptionForDirection(World.Direction.North),
+                GetTravelOptionForDirection(World.Direction.East),
+                GetTravelOptionForDirection(World.Direction.South),
+                GetTravelOptionForDirection(World.Direction.West),
             });
+            var choice = ConsoleRunner.Prompt("Travel?", options);
             return InputCharToDirection(choice);
+        }
+
+        private Option GetTravelOptionForDirection(World.Direction direction)
+        {
+            var current = World[CurrentCoord];
+            return new(current.GetTravelPrompt(direction), DirectionToInputChar(direction));
         }
 
         private static char DirectionToInputChar(World.Direction direction) => direction switch
