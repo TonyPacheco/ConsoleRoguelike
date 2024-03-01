@@ -80,6 +80,17 @@ namespace Roguelike.Runners
         }
 
         /// <summary>
+        /// Writes a single message, with a pause awaiting a player key press afterward
+        /// </summary>
+        public static void Write(string msg)
+        {
+            ClearOutputPane();
+            _engine.WriteText(CURSOR_WRITE, msg);
+            Refresh();
+            Console.Read();
+        }
+
+        /// <summary>
         /// Writes a series of messages, with a pause awaiting a player key press between each if <paramref name="pauseBetweenMsgs"/> which defaults to true
         /// </summary>
         public static void Write(ICollection<string> msgs, bool pauseBetweenMsgs = true)

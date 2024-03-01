@@ -49,17 +49,12 @@ namespace Roguelike
                 ConsoleRunner.UpdateMap(World, CurrentCoord);
 
                 //Output
-                var messages = new List<string>
-                {
-                    newTile.Blurb
-                };
+                UpdateCurrentLocationOutput();
                 if(newTile.TurnFirstEnterred == CurrentTurnNumber)
                 {
                     Player.Experience += 1;
-                    messages.Add("You gain 1xp for exploring a new area.");
+                    ConsoleRunner.Write("You gain 1xp for exploring a new area.");
                 }
-                UpdateCurrentLocationOutput();
-                ConsoleRunner.Write(messages, false);
 
                 //Update
                 ConsoleRunner.UpdatePlayerInfo(Player);
@@ -69,7 +64,9 @@ namespace Roguelike
         public void UpdateCurrentLocationOutput()
         {
             var currentTile = World[CurrentCoord];
-            ConsoleRunner.WriteHeader("Current Location:", $"{currentTile.Type} @ [{currentTile.Coord.X},{currentTile.Coord.Y}]");
+            ConsoleRunner.WriteHeader(
+                $"Current Location: {currentTile.Type} @ [{currentTile.Coord.X},{currentTile.Coord.Y}]",
+                currentTile.Blurb);
         }
 
         /// <summary>

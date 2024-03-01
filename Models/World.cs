@@ -165,7 +165,10 @@ namespace Roguelike
         {
             Game.Instance.CurrentCoord = coord;
             var tile = this[coord];
-            tile.TurnFirstEnterred = Game.Instance.CurrentTurnNumber;
+            if(tile.TurnFirstEnterred == -1)
+            {
+                tile.TurnFirstEnterred = Game.Instance.CurrentTurnNumber;
+            }
             DiscoverNeighbors(tile, coord);
             return tile;
         }
