@@ -27,7 +27,9 @@ namespace Roguelike.Runners
         private static readonly Point XP_SLOT = new (2, 2);
         private static readonly Point HP_SLOT = new (15, 2);
 
-        private static readonly Point MAP_CENTRE = new (SIDE_BAR_W / 2, 12);
+        private static readonly Point MAP_CENTRE = new (SIDE_BAR_W / 2, 9);
+
+        private static readonly Point MENU_START = new(0, 15);
 
         private const int TOP_BAR_H = 3;
         private const int SIDE_BAR_W = 30;
@@ -52,12 +54,12 @@ namespace Roguelike.Runners
             _engine.ClearBuffer();
             _engine.SetDefaultColor(Colors.White);
             _engine.Fill(FIRST_CHAR, FINAL_CHAR, Colors.Black);
-            DrawRect(FIRST_CHAR, FINAL_CHAR);
-            DrawBar(new (0, TOP_BAR_H), WIN_W, LEFT_T, RIGHT_T); //fix right connect
-            DrawPipe(new (SIDE_BAR_W, 0), WIN_H, TOP_T, BOT_T);
-            _engine.WriteText(new(SIDE_BAR_W, TOP_BAR_H), CROSS);
-            DrawBar(new (SIDE_BAR_W, WIN_H - 3), WIN_W - SIDE_BAR_W, LEFT_T, RIGHT_T);
-            DrawBar(new (0, SIDE_BAR_W + 6), SIDE_BAR_W + 1, LEFT_T, RIGHT_T); //fix right connect
+            DrawRect(FIRST_CHAR, FINAL_CHAR);                                           //Outer Border
+            DrawBar(new (0, TOP_BAR_H), WIN_W, LEFT_T, RIGHT_T);                        //Top Bar below Player info and Header
+            DrawPipe(new (SIDE_BAR_W, 0), WIN_H, TOP_T, BOT_T);                         //Vertical divider
+            _engine.WriteText(new(SIDE_BAR_W, TOP_BAR_H), CROSS);                       //Cross where Header and Divider meet
+            DrawBar(new (SIDE_BAR_W, WIN_H - 3), WIN_W - SIDE_BAR_W, LEFT_T, RIGHT_T);  //Bottom Bar above input field
+            DrawBar(MENU_START, SIDE_BAR_W + 1, LEFT_T, RIGHT_T);                           //Left Bar between Map and Menu
             Refresh();
         }
 
@@ -250,14 +252,14 @@ namespace Roguelike.Runners
             {
                 _engine.WriteText(new(start.X, start.Y + i), PIPE, color);
             }
-            _engine.WriteText(new(start.X, start.Y + height), endCap, color);
+            _engine.WriteText(new(start.X, start.Y + height - 1), endCap, color);
         }
 
         private static void DrawBar(Point start, int width, char startCap = BAR, char endCap = BAR, int color = Colors.White)
         {
             _engine.WriteText(start, startCap, color);
-            _engine.WriteText(new(start.X + 1, start.Y), BAR.Repeat(width - 2), color);
-            _engine.WriteText(new(start.X + width, start.Y), endCap, color);
+            _engine.WriteText(new(start.X + 1, start.Y), BAR.Repeat(width - 1), color);
+            _engine.WriteText(new(start.X + width - 1, start.Y), endCap, color);
         }
 
         private static void DrawRect(Point start, Point end, int color = Colors.White)
