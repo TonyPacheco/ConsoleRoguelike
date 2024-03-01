@@ -293,25 +293,25 @@ namespace Roguelike.Runners
 
     public class Choice
     {
-        private int int_val;
-        private string str_val;
-        private Direction? dir_val => Enum.IsDefined(typeof(Direction), int_val) ? (Direction) int_val : null;
+        private readonly int _int_val;
+        private readonly string _str_val;
+        private Direction? dir_val => Enum.IsDefined(typeof(Direction), _int_val) ? (Direction) _int_val : null;
 
         public Choice(string s, int i = 0)
         {
-            str_val = s;
-            int_val = i;
+            _str_val = s;
+            _int_val = i;
         }
 
         public Choice(Option selected)
         {
-            str_val = selected.Text;
-            int_val = selected.Selector;
+            _str_val = selected.Text;
+            _int_val = selected.Selector;
         }
 
-        public static implicit operator char(Choice c) => (char) c.int_val;
-        public static implicit operator int(Choice c) => c.int_val;
-        public static implicit operator string(Choice c) => c.str_val;
+        public static implicit operator char(Choice c) => (char) c._int_val;
+        public static implicit operator int(Choice c) => c._int_val;
+        public static implicit operator string(Choice c) => c._str_val;
         public static implicit operator Direction?(Choice c) => c.dir_val;
     }
 
@@ -338,6 +338,8 @@ namespace Roguelike.Runners
         {
             return Selector == input;
         }
+
+        public override string ToString() => Display;
     }
 
     public class OptionGroup : IEnumerable<(Option Option, int Index)>
